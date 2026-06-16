@@ -1,0 +1,46 @@
+# =============================================================================
+# NON-REDISTRIBUTABLE / SENSITIVE -- NEVER COMMIT
+# The IMU module's wire-level interface comes from a vendor ICD that is not
+# redistributable. Keep the ICD and any technical data derived from it (UUIDs,
+# byte offsets, register maps, status bitfields) out of the repo.
+# =============================================================================
+*.pdf
+docs/icd/
+**/[Ii][Cc][Dd]*
+# Device-specific interface constants kept local (real UUIDs, offsets, registers):
+config/device_local.*
+src/bootins/bmu/device_interface_local.py
+.env
+secrets.*
+
+# --- Internal working docs (kept local, not part of the public artifact) ---
+# Project brain + ICD-derived design notes. Don't sync via git; copy manually or
+# use a private repo if you need them on another machine.
+CLAUDE.md
+docs/
+
+# --- Captured data (large, binary, and potentially sensitive) ---
+data/
+logs/
+*.bmu
+*.raw
+
+# --- Python ---
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
