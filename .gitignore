@@ -24,6 +24,8 @@ data/
 logs/
 *.bmu
 *.raw
+# Scan/bring-up dumps: contain device UUIDs (ICD-derived) + bystander MAC addresses.
+scan*.txt
 
 # --- Python ---
 .venv/

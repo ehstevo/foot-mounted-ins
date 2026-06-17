@@ -11,7 +11,7 @@ The module advertises a custom 128-bit service UUID. That UUID is device-specifi
 and lives in config/device_local.py (gitignored) -- see config/device.example.py.
 We use it as a fingerprint to pick the module out of all the other BLE noise nearby.
 
-Run on a Linux box with a Bluetooth adapter (your Ubuntu machine; later the Pi):
+Run on a Linux box with a Bluetooth adapter:
     pip install bleak
     cp config/device.example.py config/device_local.py   # then fill in the UUID
     python scripts/ble_scan.py
@@ -48,35 +48,11 @@ SERVICE_UUID = _load_device_config().SERVICE_UUID.lower()
 
 
 async def main() -> None:
-    """Scan for BLE advertisements, print every device heard, and flag any that
-    advertise SERVICE_UUID.
-
-    Implement these steps:
-
-    1. Run a scan for SCAN_SECONDS. The call you want is:
-           found = await BleakScanner.discover(timeout=SCAN_SECONDS, return_adv=True)
-       With return_adv=True this returns a dict:
-           { address(str): (device: BLEDevice, adv: AdvertisementData) }
-       From each pair you can read:
-           device.address              -> the address string
-           adv.rssi                    -> signal strength (dBm; closer to 0 = stronger)
-           adv.local_name              -> advertised name (may be None)
-           adv.service_uuids           -> list[str] of advertised UUIDs (may be empty)
-
-    2. If `found` is empty, the adapter likely isn't up. Print a hint
-       (e.g. "bluetoothctl power on") and return.
-
-    3. For each device, decide is_match = (SERVICE_UUID is in the advertised UUIDs,
-       lowercased). Print one line per device: address, rssi, name, and a marker
-       when it matches.
-
-    4. After the loop, summarize: if any matched, print their address(es) for Rung 2
-       (connect). If none matched, print the troubleshooting checks (powered? in
-       range? already connected elsewhere? UUID not advertised?).
-
-    Note: some peripherals don't advertise their service UUIDs at all - if so, step 3
-    won't flag it, but you may still recognize it by name or by a strong RSSI that
-    appears only when the module is near. We confirm by connecting in Rung 2 either way.
+    """Scan for SCAN_SECONDS, print every BLE device heard, and flag any advertising
+    SERVICE_UUID. An empty result points at the adapter, not an empty room; no match
+    is inconclusive, since many peripherals omit their service UUID from the 31-byte
+    advertisement -- such a device is still recognizable by name or RSSI and confirmed
+    by connecting in Rung 2.
     """
     print(f"Scanning {SCAN_SECONDS:.0f}s for BLE advertisements...")
     print(f"Fingerprint (service UUID): {SERVICE_UUID}\n")
