@@ -16,7 +16,7 @@ against config/device_local.py before we write a single byte of parsing code:
 Output of a good run = the exact characteristics Rung 3 (subscribe + log) will use,
 and confidence that device_local.py is correct.
 
-Run on the Linux box that saw the device in Rung 1:
+Run on a Linux machine that saw the device in Rung 1:
     python scripts/ble_inspect.py [ADDRESS]
 ADDRESS is optional: it defaults to cfg.DEVICE_ADDRESS, and the CLI arg overrides it.
 (Use the address Rung 1 printed for the module, e.g. the one named like your unit.)
@@ -67,55 +67,21 @@ def _resolve_address() -> str:
 
 
 async def main() -> None:
-    """Connect to the module and inspect its GATT table.
-
-    Implement these steps:
-
-    1. CONNECT. Use BleakClient as an async context manager so disconnect is
-       automatic even on error:
-           async with BleakClient(address, timeout=CONNECT_TIMEOUT) as client:
-               ...
-       Inside the block, `client.is_connected` should be True. If the connect
-       itself raises (BleakError / TimeoutError / asyncio.TimeoutError), catch it
-       and print a hint -- most common causes: the device is connected to another
-       host (phone/Pi), out of range, or needs pairing.
-
-    2. ENUMERATE the GATT table. After connect, bleak has already done service
-       discovery; the result is `client.services` (a collection you can iterate).
-       For each service, then each characteristic under it, print a readable tree:
-           service.uuid, service.description
-             char.uuid, char.properties (a list[str] like ['read','notify']),
-             char.handle, char.description
-       This is the ground truth of what the device offers -- print ALL of it, not
-       just the chars you expect, so anything surprising is visible.
-
-    3. VERIFY against config. Build a lookup of {char_uuid(lowercased): properties}
-       across all services, and the set of service UUIDs. Then check, printing a
-       clear PASS/FAIL line for each:
-         (a) cfg.SERVICE_UUID  is among the service UUIDs.
-         (b) cfg.IMU_DATA_UUID is present AND its properties include 'notify'
-             (some devices use 'indicate' instead -- accept either; that's the
-             channel the 100 Hz stream will arrive on in Rung 3).
-         (c) cfg.CONTROL_UUID  is present AND its properties include 'read' and/or
-             'write'.
-       Lowercase both sides before comparing -- bleak's casing isn't guaranteed.
-
-    4. SUMMARIZE. If all three PASS, print that the device matches the ICD and is
-       ready for Rung 3 (subscribe to the IMU char + log raw bytes). If any FAIL,
-       say which -- a missing service/char means a wrong UUID in device_local.py or
-       a different firmware than expected; a present char missing 'notify' means our
-       streaming assumption is wrong and we rethink Rung 3.
-
-    Tip: keep the raw enumeration (step 2) and the judgement (step 3) separate --
-    print the full table first, THEN the checks. When something is off, you want to
-    eyeball reality before trusting the pass/fail logic, same discipline as Rung 1.
+    """Connect to the module, enumerate its full GATT table, and verify the three
+    characteristics we depend on against config: the service exists, the IMU-data
+    char can notify (or indicate), and the control char is read/write. The raw
+    enumeration is printed in full before any pass/fail judgement so reality is
+    visible first -- when a check fails, you want to eyeball the table before
+    trusting the logic. UUID comparisons are lowercased on both sides (bleak's
+    casing isn't guaranteed), and the connection context owns the verification
+    because `client.services` is only valid while connected.
     """
     address = _resolve_address()
     print(f"Connecting to {address} (timeout {CONNECT_TIMEOUT:.0f}s)...")
     
     try:
         async with BleakClient(address, timeout=CONNECT_TIMEOUT) as client:
-            # --- Step 2: enumerate the full GATT table (ground truth) ---
+            # enumerate the full GATT table (ground truth)
             service_uuids = set()
             char_props = {}  # uuid(lowercased) -> properties (list[str])
             for service in client.services:
@@ -126,9 +92,8 @@ async def main() -> None:
                     print(f"    Char: {char.uuid}  {char.properties}  "
                           f"handle={char.handle}  ({char.description})")
 
-            # --- Step 3: verify against config (absent / wrong-props / good) ---
-            # Each check records a bool AND prints its own line, so the summary in
-            # step 4 can give one verdict without re-deriving any of the logic.
+            # verify against config (absent / wrong-props / good)
+            # Each check records a bool AND prints its own line
             print()
             ok_service = CFG.SERVICE_UUID.lower() in service_uuids
             if ok_service:
@@ -154,7 +119,7 @@ async def main() -> None:
             else:
                 print("FAIL: control char NOT present -- check CONTROL_UUID")
 
-            # --- Step 4: one verdict on top of the three checks ---
+            # one verdict on top of the three checks
             print()
             if ok_service and ok_imu and ok_ctrl:
                 print("READY: device matches the ICD. Next is Rung 3 -- subscribe to the")
