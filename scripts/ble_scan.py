@@ -34,7 +34,7 @@ def _load_device_config():
     if not path.exists():
         raise SystemExit(
             "Missing config/device_local.py.\n"
-            "  cp config/device.example.py config/device_local.py\n"
+            "  cp config/device_example.py config/device_local.py\n"
             "then fill in your device's UUIDs from the ICD."
         )
     spec = importlib.util.spec_from_file_location("device_local", path)
