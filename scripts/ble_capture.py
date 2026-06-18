@@ -9,7 +9,7 @@ notifications and write every payload to disk, faithfully and ICD-agnostically,
 so the capture can be replayed later through the parser without this script ever
 needing to understand a single byte of the message.
 
-Design (locked with the mentor before writing -- see the two decisions):
+Design:
   * The logger is DUMB. It never parses the payload. Each notification is stored
     as a self-delimiting capture-layer record:
         <f64 arrival_monotonic_s> <u16 payload_len> <payload_len raw bytes>
@@ -93,46 +93,16 @@ def _resolve_seconds() -> float:
 
 
 async def main() -> None:
-    """Connect, subscribe to the IMU-data characteristic, and stream every
-    notification to a framed .bmu file for `seconds`, then report the rate.
+    """Connect, subscribe to the IMU-data characteristic, stream every notification
+    to a framed .bmu for `seconds`, write a .meta.yaml sidecar, and report the rate.
 
-    Implement these steps:
-
-    1. SET UP OUTPUT. Make data/ if needed (Path(...).mkdir(parents=True,
-       exist_ok=True)). Build a run basename from the wall-clock start time
-       (datetime.now().strftime(...)) -- you need datetime + time here. Open the
-       .bmu path for binary append/write ("wb"). Keep the wall-clock start; you'll
-       write it to the sidecar.
-
-    2. DEFINE THE NOTIFICATION HANDLER. bleak calls it as
-           def handler(char, data: bytearray) -> None
-       For each notification:
-         - stamp arrival with time.monotonic(),
-         - write one record: struct.pack("<dH", t_arrival, len(data)) + bytes(data),
-         - bump a counter (use a mutable holder or nonlocal, since the handler is a
-           nested function). Do NOT parse `data` -- the logger stays ICD-agnostic.
-       Keep the handler fast: just stamp + write + count. No printing per packet.
-
-    3. CONNECT + SUBSCRIBE. async with BleakClient(address, timeout=CONNECT_TIMEOUT):
-           await client.start_notify(CFG.IMU_DATA_UUID, handler)
-       Then await asyncio.sleep(seconds) to let notifications flow. Finally
-           await client.stop_notify(CFG.IMU_DATA_UUID)
-       (stop before leaving the context so we unsubscribe cleanly). Catch
-       (BleakError, asyncio.TimeoutError) for connection-class failures only, same
-       discipline as Rung 2 -- logic bugs should surface as real tracebacks.
-
-    4. WRITE THE SIDECAR + SUMMARIZE. After the capture closes:
-         - write data/<basename>.meta.yaml with: device address, start wall-clock
-           (ISO string), capture seconds, notification count, bytes written, and the
-           record format string ("<dH then payload") so a reader knows how to decode.
-         - print a summary: count, elapsed, measured rate = count / elapsed, and
-           compare to EXPECTED_RATE_HZ. If the rate is within, say, 10%, call it a
-           PASS; otherwise flag it (too low -> dropouts/range; zero -> wrong UUID or
-           never subscribed).
-
-    Note on time: arrival timestamps are time.monotonic() and are for diagnostics
-    ONLY (rate, later jitter analysis). Integration uses the payload's own dt, never
-    these. The wall-clock start in the sidecar is just to anchor the run in real time.
+    The notification handler stays deliberately dumb -- it stamps arrival, frames the
+    payload, writes it, and counts, but never parses the bytes. That keeps the capture
+    independent of (and a check on) the parser. Arrival is time.monotonic(), used for
+    diagnostics only: rate here, jitter later. Integration always uses the payload's
+    own dt, never arrival time; the wall-clock start lives once in the sidecar just to
+    anchor the run in real time. Connection-class failures are caught and explained;
+    anything else is a logic bug and is left to raise.
     """
     # Step 1: resolve the invocation FIRST, so a bad address/seconds bails out
     # before we create an empty .bmu file. Anchor data/ at the repo root (like the
