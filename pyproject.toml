@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bootins"
+version = "0.0.0"
+description = "Foot-mounted ZUPT-aided strapdown INS with loosely-coupled GNSS fusion."
+requires-python = ">=3.12"
+dependencies = ["numpy", "scipy", "pyyaml", "bleak"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
