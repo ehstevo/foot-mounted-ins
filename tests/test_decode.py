@@ -21,7 +21,7 @@ from bootins.bmu import decode
 from bootins.bmu import device_interface_local as iface
 
 
-def _pack_0x0003(blocks: list[dict]) -> bytes:
+def _pack_quat(blocks: list[dict]) -> bytes:
     """Build a synthetic Quaternion Data message from a list of block dicts, each with
     keys: quat (4,), dt (float), dtheta_deg (3,), dv (3,). dtheta is packed in
     DEGREES, exactly as the device sends it."""
@@ -60,7 +60,7 @@ def test_single_block_roundtrip():
         "dtheta_deg": [1,2,3],
         "dv": [0.1, 0.2, 9.8]
     }
-    msg = _pack_0x0003([block])
+    msg = _pack_quat([block])
     out = decode.decode_message(msg)
     assert len(out) == 1
     assert out[0].dt == pytest.approx(0.01)
@@ -99,7 +99,7 @@ def test_multiple_blocks():
         "dv": [0.7, 0.8, 9.8]
     }
     blocks = [block1, block2, block3, block4]
-    msg = _pack_0x0003(blocks)
+    msg = _pack_quat(blocks)
     out = decode.decode_message(msg)
     assert len(out) == 4
     assert out[0].dt == pytest.approx(0.01)
@@ -129,7 +129,7 @@ def test_rejects_wrong_msgid():
     purely on the message type.
     """
     block = {"quat": [1, 0, 0, 0], "dt": 0.01, "dtheta_deg": [1, 2, 3], "dv": [0.1, 0.2, 9.8]}
-    msg = bytearray(_pack_0x0003([block]))
+    msg = bytearray(_pack_quat([block]))
     struct.pack_into(iface.ENDIAN + "H", msg, 0, 0x0001)
     with pytest.raises(ValueError):
         decode.decode_message(bytes(msg))
