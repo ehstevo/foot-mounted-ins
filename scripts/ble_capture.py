@@ -23,19 +23,22 @@ Design:
     the parser, not here.
 
 Output (under data/, which is gitignored):
-    data/<timestamp>.bmu        framed raw capture
-    data/<timestamp>.meta.yaml  run context (address, start wall-clock, counts)
+    data/<timestamp>[_<label>].bmu        framed raw capture
+    data/<timestamp>[_<label>].meta.yaml  run context (address, wall-clock, counts, label)
 
 Run on a Linux machine that passed Rung 2:
-    python scripts/ble_capture.py [ADDRESS] [SECONDS]
-ADDRESS defaults to cfg.DEVICE_ADDRESS; SECONDS defaults to CAPTURE_SECONDS.
+    python scripts/ble_capture.py [address] [-s SECONDS] [-l LABEL]
+address defaults to cfg.DEVICE_ADDRESS; -s/--seconds defaults to CAPTURE_SECONDS;
+-l/--label is an optional tag (e.g. a rest pose: 'poseA') added to the output
+filenames and recorded in the sidecar so the capture is self-describing.
+Run with -h/--help for the full interface.
 
 SUCCESS = a .bmu file whose measured notification rate is ~25/s.
 """
+import argparse
 import asyncio
 import importlib.util
 import struct
-import sys
 import time
 from datetime import datetime
 from pathlib import Path
@@ -72,10 +75,39 @@ def _load_device_config():
 CFG = _load_device_config()
 
 
-def _resolve_address() -> str:
-    """CLI arg wins; otherwise fall back to cfg.DEVICE_ADDRESS. Fail loudly if
+def _sanitize_label(raw: str) -> str:
+    """argparse `type` for --label: the tag becomes part of a filename, so keep
+    only [A-Za-z0-9._-]; every other char becomes '_'."""
+    return "".join(c if (c.isalnum() or c in "._-") else "_" for c in raw)
+
+
+def _parse_args() -> argparse.Namespace:
+    """Define and parse the CLI. address is an optional positional (falls back to
+    cfg.DEVICE_ADDRESS); seconds and label are order-independent flags."""
+    parser = argparse.ArgumentParser(
+        description="Subscribe to the IMU stream and log raw notifications to a "
+                    "replayable .bmu capture (+ .meta.yaml sidecar).",
+    )
+    parser.add_argument(
+        "address", nargs="?", default=None,
+        help="BLE address of the device. Defaults to cfg.DEVICE_ADDRESS if set.",
+    )
+    parser.add_argument(
+        "-s", "--seconds", type=float, default=CAPTURE_SECONDS,
+        help=f"capture window in seconds (default: {CAPTURE_SECONDS:.0f})",
+    )
+    parser.add_argument(
+        "-l", "--label", type=_sanitize_label, default="",
+        help="optional tag for this run (e.g. a rest pose: 'poseA'); added to the "
+             "output filenames and recorded in the sidecar",
+    )
+    return parser.parse_args()
+
+
+def _resolve_address(cli_address: str | None) -> str:
+    """CLI address wins; otherwise fall back to cfg.DEVICE_ADDRESS. Fail loudly if
     neither is set -- connecting needs a concrete target."""
-    address = sys.argv[1] if len(sys.argv) > 1 else getattr(CFG, "DEVICE_ADDRESS", "")
+    address = cli_address or getattr(CFG, "DEVICE_ADDRESS", "")
     if not address:
         raise SystemExit(
             "No address. Either pass one:\n"
@@ -83,13 +115,6 @@ def _resolve_address() -> str:
             "or set DEVICE_ADDRESS in config/device_local.py to the module's address."
         )
     return address
-
-
-def _resolve_seconds() -> float:
-    """Optional argv[2] capture window; defaults to CAPTURE_SECONDS."""
-    if len(sys.argv) > 2:
-        return float(sys.argv[2])
-    return CAPTURE_SECONDS
 
 
 async def main() -> None:
@@ -107,14 +132,18 @@ async def main() -> None:
     # Step 1: resolve the invocation FIRST, so a bad address/seconds bails out
     # before we create an empty .bmu file. Anchor data/ at the repo root (like the
     # other scripts) so the capture lands in the same place regardless of cwd.
-    address = _resolve_address()
-    seconds = _resolve_seconds()
+    args = _parse_args()
+    address = _resolve_address(args.address)
+    seconds = args.seconds
+    label = args.label
 
     data_dir = Path(__file__).resolve().parents[1] / "data"
     data_dir.mkdir(parents=True, exist_ok=True)
 
     start_wall = datetime.now()
     run_basename = start_wall.strftime("%Y%m%d_%H%M%S")
+    if label:
+        run_basename = f"{run_basename}_{label}"
     bmu_path = data_dir / f"{run_basename}.bmu"
     meta_path = data_dir / f"{run_basename}.meta.yaml"
 
@@ -156,6 +185,7 @@ async def main() -> None:
     # Step 4: write the sidecar, then report the rate.
     meta = {
         "device_address": address,
+        "pose_label": label or None,
         "start_wall_clock": start_wall.isoformat(timespec="seconds"),
         "capture_seconds_requested": seconds,
         "capture_seconds_elapsed": round(elapsed, 3),
