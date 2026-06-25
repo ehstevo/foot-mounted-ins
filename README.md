@@ -5,10 +5,10 @@ ZUPT-aided strapdown INS fused with GNSS through a **loosely-coupled error-state
 Filter**, estimating position, velocity, and attitude from a foot-worn IMU.
 
 The goal is a correct, well-tested, research-grade implementation where every component is derived
-and understood — not a black box. Each module is built one rung at a time: *concept → derivation →
+and understood, not a black box. Each module is built one rung at a time: *concept → derivation →
 implementation → a test that fails if the understanding is wrong.*
 
-> **Status:** early — building the sensor data pipeline first (BLE ingest, replayable logging,
+> **Status:** early - building the sensor data pipeline first (BLE ingest, replayable logging,
 > delta-form parsing) before the estimation stack.
 
 ---
@@ -39,12 +39,12 @@ IMU (BLE, 100 Hz, delta-form Δθ/Δv/Δt)
 Key engineering choices:
 
 - **Local-level NED** navigation frame; **quaternion** attitude (Hamilton, scalar-first, body→nav).
-- **Delta-form mechanization** — consume coning/sculling-integrated increments directly at 100 Hz.
+- **Delta-form mechanization** - consume coning/sculling-integrated increments directly at 100 Hz.
 - **Error-state (indirect) EKF**, 15 states growing to include sensor biases and a sensor↔GNSS
   clock-offset term.
-- **Source-agnostic ingest** — live BLE and replayed logs flow through one identical interface, so
+- **Source-agnostic ingest** - live BLE and replayed logs flow through one identical interface, so
   every result is reproducible offline.
-- **Faithful parsing, separate judgement** — the parser decodes exactly what arrived; plausibility
+- **Faithful parsing, separate judgement** - the parser decodes exactly what arrived; plausibility
   checks and dropout handling live in dedicated layers.
 
 ## Hardware
@@ -89,8 +89,8 @@ python scripts/ble_scan.py      # Rung 1: discover the module over BLE
 ## Development
 
 This is a deliberate first-principles learning build. I implement and test the components myself,
-using an AI assistant (Claude) as a design partner and mentor — for derivations, architecture
-review, and catching mistakes — while the engineering decisions, and the understanding behind them,
+using an AI assistant (Claude) as a design partner and mentor, for derivations, architecture
+review, and catching mistakes, while the engineering decisions, and the understanding behind them,
 are my own.
 
 ## License
