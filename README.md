@@ -1,4 +1,4 @@
-# GPS-INS-Boot — Foot-Mounted Pedestrian Inertial Navigation
+# GPS-INS-Boot - Foot-Mounted Pedestrian Inertial Navigation
 
 A from-first-principles build of a **boot-mounted pedestrian inertial navigation system**: a
 ZUPT-aided strapdown INS fused with GNSS through a **loosely-coupled error-state Extended Kalman
@@ -20,7 +20,7 @@ A foot-mounted IMU is a uniquely powerful navigation platform: every footfall pr
 reckoning. Combined with GNSS for absolute position, it yields meter-level pedestrian tracking that
 keeps working through GNSS outages.
 
-The hard parts — and the focus of this project — are the unglamorous ones that decide whether it
+The hard parts, and the focus of this project, are the unglamorous ones that decide whether it
 actually works: rigorous **reference-frame and sign conventions**, correct **delta-form strapdown
 mechanization**, honest **error modeling**, robust **outlier and dropout handling**, and validation
 against ground truth.
