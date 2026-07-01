@@ -86,10 +86,62 @@ def quat_to_euler(q: np.ndarray) -> tuple[float, float, float]:
 
 
 def euler_to_quat(phi: float, theta: float, psi: float) -> np.ndarray:
-    """Z-Y-X Euler angles (rad) -> unit quaternion. Deferred to Rung 4.
+    """Z-Y-X Euler angles (rad) -> unit quaternion (the inverse of quat_to_euler).
 
-    Planned form: compose three axis-angle quaternions in the same Z-Y-X order as
-    `euler_to_dcm`, i.e. qz(psi) ⊗ qy(theta) ⊗ qx(phi). Needs `quat_multiply`
-    (the Hamilton product), which arrives with the Rung 4 rate kinematics.
+    Compose three single-axis quaternions -- but in the REVERSE of the angle-list
+    axis order: qz ⊗ qy ⊗ qx, NOT qx ⊗ qy ⊗ qz. Here is exactly why. euler_to_dcm
+    builds C^b_n = rot_x(phi) @ rot_y(theta) @ rot_z(psi) and then TRANSPOSES to
+    C^n_b, and transposing a product reverses its order:
+        C^n_b = rot_z(psi).T @ rot_y(theta).T @ rot_x(phi).T
+    Each quat_to_dcm(q_k) is that same per-axis C^n_b factor, and quat_multiply is
+    a homomorphism (dcm(a ⊗ b) = dcm(a) @ dcm(b), with NO reversal). Matching the
+    two forces the quaternion product into the already-reversed order qz ⊗ qy ⊗ qx.
     """
-    raise NotImplementedError("euler_to_quat lands in Rung 4 (needs quat_multiply)")
+    qx = quat_from_axis_angle([1, 0, 0], phi)
+    qy = quat_from_axis_angle([0, 1, 0], theta)
+    qz = quat_from_axis_angle([0, 0, 1], psi)
+    return quat_multiply(qz, quat_multiply(qy, qx))
+
+
+def quat_multiply(p: np.ndarray, q: np.ndarray) -> np.ndarray:
+    """Hamilton product p ⊗ q (scalar-first) -- the composition of rotations.
+
+    Reads right-to-left like a DCM product: p ⊗ q means "do q FIRST, then p"
+    (so quat_to_dcm(p ⊗ q) == quat_to_dcm(p) @ quat_to_dcm(q)). This is the ⊗
+    behind the attitude update q_new = q ⊗ Δq and the rate law q̇ = ½ q ⊗ [0, ω].
+
+    Splitting each into scalar/vector parts p = (p0, pv), q = (q0, qv), the
+    imaginary-unit rules i²=j²=k²=-1 collapse the 16-term expansion to
+        p ⊗ q = ( p0*q0 − pv·qv ,  p0*qv + q0*pv + pv x qv )
+    The DOT term is the fingerprint of the squares (i²=-1); the CROSS term is the
+    fingerprint of anticommutativity (ij=-ji). That cross term is why ⊗ does NOT
+    commute: p⊗q − q⊗p = 2(pv x qv), nonzero exactly when the axes aren't
+    parallel -- the algebra of "rotations depend on order."
+    """
+    p = np.asarray(p, dtype=float)
+    q = np.asarray(q, dtype=float)
+    p0, pv = p[0], p[1:]
+    q0, qv = q[0], q[1:]
+    w = p0*q0 - np.dot(pv, qv)
+    v = p0*qv + q0*pv + np.cross(pv, qv)
+    return np.array([w, *v])
+
+
+def q_dot(q: np.ndarray, omega: np.ndarray) -> np.ndarray:
+    """Attitude kinematics q̇ = ½ q ⊗ [0, ω] -- the equation mechanization integrates.
+
+    Given the current attitude q (body->nav) and the BODY-frame angular rate omega
+    (rad/s), returns the time-derivative q̇. NOTE q̇ is a RATE, not a rotation: it is
+    the 'velocity' of the attitude (generally non-unit, and tangent to the |q|=1
+    sphere). You integrate it to dead-reckon attitude from gyro rates, e.g.
+    q(t+dt) ≈ normalize(q + q̇·dt).
+
+    omega is packed into a PURE quaternion [0, ω] (zero scalar) only so the Hamilton
+    product is defined -- it is angular velocity, not an orientation. It sits on the
+    RIGHT because a body-frame rate composes on the body side (a nav-frame rate would
+    be ½ [0, ω] ⊗ q instead). The ½ is the half-angle surviving the dt->0 limit of
+    the discrete update q_new = q ⊗ Δq.
+    """
+    q = np.asarray(q, dtype=float)
+    omega = np.asarray(omega, dtype=float)
+    return 0.5 * quat_multiply(q, [0, *omega])

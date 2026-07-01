@@ -24,6 +24,11 @@ ANGLES_RAD = [0, np.pi / 6, np.pi / 4, np.pi / 3, np.pi / 2, np.pi]
 # and every (incl. cross-coupling) entry of quat_to_dcm gets exercised.
 AXES = [[1.0, 0, 0], [0, 1.0, 0], [0, 0, 1.0], [1.0, 1.0, 1.0], [1.0, -2.0, 0.5]]
 
+# (phi, theta, psi) triples, pitch kept off +/-90 deg so the round-trip is defined.
+# Non-principal so a wrong compose order (qx⊗qy⊗qz vs qz⊗qy⊗qx) can't hide.
+EULER_TRIPLES = [(0.0, 0.0, 0.0), (0.3, -0.5, 1.1),
+                 (-np.pi / 3, np.pi / 6, np.pi / 4), (0.9, 0.2, -2.0)]
+
 
 def test_identity():
     """The identity quaternion is no rotation."""
@@ -84,3 +89,64 @@ def test_quat_to_euler():
         for a in [np.pi / 6, np.pi / 4, np.pi / 3]:
             e = quaternion.quat_to_euler(quaternion.quat_from_axis_angle(axis, a))
             np.testing.assert_allclose(e[slot], a, atol=1e-12)
+
+
+def test_quat_multiply_pins():
+    """Concrete, hand-computed products pin the dot/cross transcription and the
+    scalar-first ordering. i⊗j = +k vs j⊗i = -k also re-proves anticommutativity
+    (the sign flip is the whole 'rotations depend on order' story)."""
+    q = [0.0, 0.6, 0.0, 0.8]
+    np.testing.assert_allclose(quaternion.quat_multiply([1, 0, 0, 0], q), q, atol=1e-12)  # identity ⊗ q = q
+    np.testing.assert_allclose(quaternion.quat_multiply([0, 1, 0, 0], [0, 0, 1, 0]),
+                               [0, 0, 0, 1], atol=1e-12)                                  # i ⊗ j = +k
+    np.testing.assert_allclose(quaternion.quat_multiply([0, 0, 1, 0], [0, 1, 0, 0]),
+                               [0, 0, 0, -1], atol=1e-12)                                 # j ⊗ i = −k
+
+
+def test_quat_multiply_composes():
+    """Oracle: ⊗ composes rotations, so dcm(p ⊗ q) == dcm(p) @ dcm(q) over every
+    pair of our test rotations. Compare DCMs, not raw quaternions, to sidestep the
+    double-cover sign ambiguity (p⊗q and -(p⊗q) are the SAME rotation). Building
+    the quaternions from quat_from_axis_angle keeps full float64 precision, so the
+    tolerance stays tight (1e-12) -- hand-typed 0.707s would force a loose 1e-3."""
+    quats = [quaternion.quat_from_axis_angle(ax, a) for ax in AXES for a in ANGLES_RAD]
+    for p in quats:
+        for q in quats:
+            lhs = quaternion.quat_to_dcm(quaternion.quat_multiply(p, q))
+            rhs = quaternion.quat_to_dcm(p) @ quaternion.quat_to_dcm(q)
+            np.testing.assert_allclose(lhs, rhs, atol=1e-12)
+
+
+def test_q_dot_matches_analytic_spin():
+    """Analytic oracle: for a CONSTANT spin at rate `rate` about a fixed unit axis
+    n̂, the trajectory and its exact derivative are known in closed form:
+        q(t)  = [cos(rate*t/2),  sin(rate*t/2) n̂]
+        q̇(t)  = (rate/2) [−sin(rate*t/2),  cos(rate*t/2) n̂]
+    Feed q(t) and the body rate ω = rate·n̂ to q_dot and compare. Deriving q̇ from
+    the angle (not from q_dot itself) is what pins the ½ factor AND the right-side
+    multiply -- a q̇-vs-q̇ check could not."""
+    for ax in AXES:
+        n = np.asarray(ax, float) / np.linalg.norm(ax)
+        for rate in [0.5, 2.0, -1.3]:
+            for t in [0.0, 0.37, 1.1]:
+                a = rate * t
+                q = np.array([np.cos(a / 2), *(np.sin(a / 2) * n)])
+                expected = (rate / 2) * np.array([-np.sin(a / 2), *(np.cos(a / 2) * n)])
+                np.testing.assert_allclose(quaternion.q_dot(q, rate * n), expected, atol=1e-12)
+
+
+def test_euler_to_quat_matches_dcm():
+    """Oracle: euler_to_quat and euler_to_dcm must describe the SAME rotation, so
+    dcm(euler_to_quat(a)) == euler_to_dcm(a). Compared as DCMs (double-cover-proof)
+    and over NON-principal triples -- this is the test that catches a reversed
+    compose order (qx⊗qy⊗qz would fail here, qz⊗qy⊗qx passes)."""
+    for a in EULER_TRIPLES:
+        np.testing.assert_allclose(quaternion.quat_to_dcm(quaternion.euler_to_quat(*a)),
+                                   euler.euler_to_dcm(*a), atol=1e-12)
+
+
+def test_euler_quat_round_trip():
+    """quat_to_euler inverts euler_to_quat off the gimbal singularity (pitch != +/-90)."""
+    for a in EULER_TRIPLES:
+        np.testing.assert_allclose(quaternion.quat_to_euler(quaternion.euler_to_quat(*a)),
+                                   a, atol=1e-12)
