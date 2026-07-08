@@ -85,3 +85,32 @@ def position_update(p, v, dt):
     returns: p_new, NED
     """
     return p + v * dt
+
+
+def mechanize_step(state, dtheta, dv, dt):
+    """Advance the nav state (p, v, q) by one IMU increment.
+
+    state : (p, v, q) -- position & velocity in NED, attitude body->nav
+    dtheta, dv, dt : one measurement triple (body frame, radians / m/s / s)
+    returns: the new (p, v, q)
+    """
+    p, v, q = state
+    q_new = attitude_update(q, dtheta)
+    v_new = velocity_update(v, q, dv, dt)
+    p_new = position_update(p, 0.5 * (v + v_new), dt)
+    return (p_new, v_new, q_new)
+
+
+def mechanize(state0, measurements):
+    """Run mechanize_step over a sequence of measurements.
+
+    state0       : initial (p, v, q)
+    measurements : iterable of (dtheta, dv, dt) triples
+    returns      : list of states, one per step, starting with state0
+    """
+    states = [state0]
+    state = state0
+    for m in measurements:
+        state = mechanize_step(state, *m)
+        states.append(state)
+    return states

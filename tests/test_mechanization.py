@@ -182,3 +182,101 @@ def test_position_zero_velocity():
     for p in p_values:
         p_new = mechanization.position_update(p, np.zeros(3), dt)
         np.testing.assert_allclose(p_new, p, atol=1e-12)
+
+
+# ---------------------------------------------------------------------------
+# full mechanization loop -- the trajectory-simulator "test oracle"
+# ---------------------------------------------------------------------------
+
+def _scipy_to_quat(R):
+    """scipy Rotation -> our scalar-first [w,x,y,z] (scipy is scalar-last)."""
+    x, y, z, w = R.as_quat()
+    return np.array([w, x, y, z])
+
+
+def simulate(p0, v0, a_nav, R0, omega_body, dt, N):
+    """Inverse-problem trajectory oracle: author a KNOWN-truth trajectory and emit
+    the exact IMU increments a perfect sensor riding it would produce.
+
+    Truth is constant nav acceleration + constant body-rate spin -- chosen because
+    it is EXACTLY representable by the discrete mechanization (trapezoidal position
+    is exact for linear velocity), so a correct loop recovers it to machine
+    precision, leaving a bug nowhere to hide:
+        v(t) = v0 + a_nav·t
+        p(t) = p0 + v0·t + ½·a_nav·t²
+        R(t) = R0 * exp(omega_body·t)         (body-frame spin, right-composed)
+
+    Increments per step (see the Rung-5b derivation):
+        Δθ_k  = rotvec( R_k⁻¹ · R_{k+1} )          (exact body increment)
+        Δv_bk = C^b_n(R_k) · (a_nav - g_ned) · dt  (specific force, body frame)
+
+    scipy generates the attitude truth so the oracle is INDEPENDENT of our
+    quaternion module. Returns (truth_states, measurements) where truth_states[k]
+    is (p, v, R) and measurements[k] is (dtheta, dv, dt).
+    """
+    truth = []
+    for k in range(N + 1):
+        t = k * dt
+        p = p0 + v0 * t + 0.5 * a_nav * t**2
+        v = v0 + a_nav * t
+        R = R0 * Rotation.from_rotvec(omega_body * t)
+        truth.append((p, v, R))
+
+    f_nav = a_nav - mechanization.G_NED          # specific force in nav = a − g
+    measurements = []
+    for k in range(N):
+        R_k = truth[k][2]
+        dtheta = (R_k.inv() * truth[k + 1][2]).as_rotvec()   # body increment
+        dv = R_k.inv().apply(f_nav) * dt                     # C^b_n · f_nav · dt
+        measurements.append((dtheta, dv, dt))
+    return truth, measurements
+
+
+def test_mechanize_recovers_trajectory():
+    """THE end-to-end test: feed the exact increments of a known translating-AND-
+    spinning trajectory through the full loop and recover position, velocity, and
+    attitude at every step to machine precision. This validates the whole cascade
+    at once -- gravity sign, the frame transforms, the body/nav bookkeeping, the
+    trapezoidal position, and the state threading. Attitude is compared as a DCM
+    (double-cover-proof) against scipy's independent truth."""
+    p0 = np.zeros(3)
+    v0 = np.array([1.0, 0.5, -0.2])
+    a_nav = np.array([0.3, -0.4, 0.6])
+    omega_body = np.array([0.5, -0.3, 0.8])
+    R0 = Rotation.from_rotvec([0.2, -0.5, 0.1])
+    dt = 0.01
+    N = 200
+
+    truth, meas = simulate(p0, v0, a_nav, R0, omega_body, dt, N)
+    states = mechanization.mechanize((p0, v0, _scipy_to_quat(R0)), meas)
+
+    assert len(states) == N + 1
+    for k in range(N + 1):
+        p_t, v_t, R_t = truth[k]
+        p_m, v_m, q_m = states[k]
+        np.testing.assert_allclose(p_m, p_t, atol=1e-9)
+        np.testing.assert_allclose(v_m, v_t, atol=1e-9)
+        np.testing.assert_allclose(quaternion.quat_to_dcm(q_m), R_t.as_matrix(), atol=1e-9)
+
+
+def test_mechanize_rest_stays_put():
+    """A tilted boot AT REST must not drift over a full run: no accel, no velocity,
+    no rotation -- but a non-level attitude, so gravity is spread across all three
+    body axes. The specific-force and gravity terms must cancel every step through
+    the whole loop, or the boot 'launches'. The full-loop version of the Rung-3
+    rest test."""
+    p0 = np.zeros(3)
+    v0 = np.zeros(3)
+    a_nav = np.zeros(3)
+    omega_body = np.zeros(3)
+    R0 = Rotation.from_rotvec([0.3, -0.7, 0.2])
+    dt = 0.01
+    N = 100
+
+    truth, meas = simulate(p0, v0, a_nav, R0, omega_body, dt, N)
+    states = mechanization.mechanize((p0, v0, _scipy_to_quat(R0)), meas)
+
+    p_final, v_final, q_final = states[-1]
+    np.testing.assert_allclose(p_final, np.zeros(3), atol=1e-9)
+    np.testing.assert_allclose(v_final, np.zeros(3), atol=1e-9)
+    np.testing.assert_allclose(quaternion.quat_to_dcm(q_final), R0.as_matrix(), atol=1e-9)
