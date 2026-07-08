@@ -26,6 +26,8 @@ import numpy as np
 
 from bootins.frames import quaternion
 
+G_NED = np.array([0.0, 0.0, 9.80665])   # local gravity vector, NED (down = +z)
+
 
 def attitude_update(q: np.ndarray, dtheta: np.ndarray) -> np.ndarray:
     """Propagate attitude one step by a body-frame rotation increment.
@@ -57,3 +59,17 @@ def attitude_update(q: np.ndarray, dtheta: np.ndarray) -> np.ndarray:
     dq = quaternion.quat_from_axis_angle(dtheta, angle)   # axis is Δθ (normalized inside), angle = |Δθ|
     q_new = quaternion.quat_multiply(q, dq)               # body increment on the RIGHT
     return quaternion.normalize(q_new)
+
+
+def velocity_update(v, q, dv, dt, gravity=G_NED):
+    """One velocity step: rotate the body-frame Δv into NED and add gravity.
+
+    v       : current velocity, NED (m/s)
+    q       : attitude to rotate Δv with, [w,x,y,z] body->nav
+    dv      : body-frame specific-force increment for this step (m/s)
+    dt      : step duration (s) -- gravity's contribution is g·dt
+    gravity : gravity vector in NED (default G_NED)
+    returns : v_new, NED
+    """
+    v_new = v + quaternion.quat_to_dcm(q) @ dv + gravity * dt
+    return v_new

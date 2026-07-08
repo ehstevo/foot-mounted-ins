@@ -104,3 +104,54 @@ def test_stays_unit_norm():
     for _ in range(500):
         q = mechanization.attitude_update(q, dtheta_step)
     np.testing.assert_allclose(np.linalg.norm(q), 1.0, atol=1e-12)
+
+
+# ---------------------------------------------------------------------------
+# velocity_update
+# ---------------------------------------------------------------------------
+
+def test_velocity_rest_cancels_any_attitude():
+    """The headline physics/sign test: a boot AT REST does not accelerate, in ANY
+    orientation. At rest the accelerometer reads specific force = -g_grav (points
+    UP), so its body-frame increment is dv_b = C^b_n · (-g_ned) · dt (the up vector
+    expressed in body coords, where C^b_n = C^n_b transposed). Feed that in and the
+    two velocity terms must cancel exactly:
+
+        C^n_b · dv_b + g_ned·dt = C^n_b · C^b_n·(-g_ned)·dt + g_ned·dt
+                                = -g_ned·dt + g_ned·dt = 0
+
+    A flipped gravity sign would instead give -2·g_ned·dt (the fatal 2g 'launch').
+    Testing every attitude proves the cancellation is a frame-independent physical
+    fact, not an artifact of q = identity."""
+    dt = 0.01
+    for ax in ([1, 0, 0], [0, 1, 0], [0, 0, 1], [1, 1, 1], [1, -2, 0.5]):
+        for angle in (0.0, 0.6, 2.0):
+            q = quaternion.quat_from_axis_angle(ax, angle)
+            C_bn = quaternion.quat_to_dcm(q).T                  # nav -> body
+            dv_rest = C_bn @ (-mechanization.G_NED) * dt        # what a resting accel reads
+            v_new = mechanization.velocity_update(np.zeros(3), q, dv_rest, dt)
+            np.testing.assert_allclose(v_new, np.zeros(3), atol=1e-12)
+
+
+def test_velocity_free_fall():
+    """The gravity term in isolation. In free fall the accelerometer is blind to
+    gravity and reads nothing (dv = 0, M2 Rung 1), so the g_ned·dt term is all that
+    survives -- the boot accelerates DOWNWARD (+z in NED) at exactly g. This is the
+    mirror image of the rest test: there the specific-force term cancelled gravity;
+    here it is absent, so gravity acts alone."""
+    dt = 0.01
+    v_new = mechanization.velocity_update(np.zeros(3), IDENTITY, np.zeros(3), dt)
+    np.testing.assert_allclose(v_new, mechanization.G_NED * dt, atol=1e-12)
+
+
+def test_velocity_rotates_dv():
+    """Oracle for the rotation term, with gravity ZEROED so only C^n_b·dv survives.
+    Compared against scipy's independent active rotation of the same vector -- this
+    pins that C^n_b is the active body->nav transform with the right convention (a
+    transpose/convention error the physics tests above would not catch). scipy is
+    scalar-LAST, so q=[w,x,y,z] is handed over reordered as [x,y,z,w]."""
+    q = quaternion.quat_from_axis_angle([1, -2, 0.5], 0.9)
+    dv = np.array([0.3, -1.1, 2.0])
+    v_new = mechanization.velocity_update(np.zeros(3), q, dv, 1.0, gravity=np.zeros(3))
+    expected = Rotation.from_quat([*q[1:], q[0]]).apply(dv)
+    np.testing.assert_allclose(v_new, expected, atol=1e-12)
