@@ -155,3 +155,30 @@ def test_velocity_rotates_dv():
     v_new = mechanization.velocity_update(np.zeros(3), q, dv, 1.0, gravity=np.zeros(3))
     expected = Rotation.from_quat([*q[1:], q[0]]).apply(dv)
     np.testing.assert_allclose(v_new, expected, atol=1e-12)
+
+
+# ---------------------------------------------------------------------------
+# position_update
+# ---------------------------------------------------------------------------
+
+def test_position_constant_velocity():
+    """Analytic oracle: at constant velocity, integrating N steps of dt must land
+    at the exact closed-form displacement v·(N·dt). Constant v makes every step's
+    v·dt exact (no changing-velocity error), so the bound stays at atol=1e-12."""
+    p = np.zeros(3)
+    v = np.array([1.0, -0.7, 0.9])
+    N = 100
+    dt = 0.01
+    for _ in range(N):
+        p = mechanization.position_update(p, v, dt)
+    np.testing.assert_allclose(p, v * (N * dt), atol=1e-12)
+
+
+def test_position_zero_velocity():
+    """Property: zero velocity leaves position unchanged, from several starting
+    positions (not just the origin)."""
+    p_values = ([0, 0, 0], [1.0, 2.0, 2.0], [-1.0, 2.5, -1.5], [3.0, -1.0, 2.0])
+    dt = 0.01
+    for p in p_values:
+        p_new = mechanization.position_update(p, np.zeros(3), dt)
+        np.testing.assert_allclose(p_new, p, atol=1e-12)

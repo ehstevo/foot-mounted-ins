@@ -7,8 +7,8 @@ device) and propagates the navigation state forward. The three stages form a
 cascade, and the ORDER is forced -- velocity needs the current attitude to rotate
 the body-frame Δv into NED, so attitude leads:
 
-    ATTITUDE  q  ── integrate Δθ ───────────────────►  q_new      (this file)
-    VELOCITY  v  ── rotate Δv to nav, then add gravity ► v_new     (Rung 3, TODO)
+    ATTITUDE  q  ── integrate Δθ ───────────────────►  q_new
+    VELOCITY  v  ── rotate Δv to nav, then add gravity ► v_new
     POSITION  p  ── integrate v ────────────────────►  p_new      (Rung 4, TODO)
 
 Conventions (from the charter / M1):
@@ -73,3 +73,15 @@ def velocity_update(v, q, dv, dt, gravity=G_NED):
     """
     v_new = v + quaternion.quat_to_dcm(q) @ dv + gravity * dt
     return v_new
+
+
+def position_update(p, v, dt):
+    """One position step: integrate velocity over the step.
+
+    p  : current position, NED (m)
+    v  : velocity to integrate, NED (m/s) -- the loop passes ½(v_old+v_new) for
+         trapezoidal integration (see Rung 5)
+    dt : step duration (s)
+    returns: p_new, NED
+    """
+    return p + v * dt
