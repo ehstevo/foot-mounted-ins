@@ -8,8 +8,10 @@ The goal is a correct, well-tested, research-grade implementation where every co
 and understood, not a black box. Each module is built one rung at a time: *concept → derivation →
 implementation → a test that fails if the understanding is wrong.*
 
-> **Status:** early - building the sensor data pipeline first (BLE ingest, replayable logging,
-> delta-form parsing) before the estimation stack.
+> **Status:** the front end is in place - BLE capture with replayable logging, a delta-form parser,
+> device-frame characterization, a from-scratch rotation toolkit (quaternion/DCM/Euler), and a
+> **working strapdown mechanization** validated end-to-end against a trajectory simulator to machine
+> precision. Next: drift & error dynamics, then the estimation stack (ZUPT + error-state EKF + GNSS).
 
 ---
 
@@ -78,10 +80,11 @@ python scripts/ble_scan.py      # Rung 1: discover the module over BLE
 
 - [x] Reference-frame & sign-convention contract
 - [x] BLE data-pipeline design (ingest → log → parse → quality/gap handling)
-- [ ] BLE capture + replayable raw logging
-- [ ] Delta-form parser + device-frame characterization
-- [ ] Rotation toolkit (quaternion/DCM/Euler) with analytic tests
-- [ ] Strapdown mechanization (validated on a trajectory simulator)
+- [x] BLE capture + replayable raw logging
+- [x] Delta-form parser + device-frame characterization
+- [x] Rotation toolkit (quaternion/DCM/Euler) with analytic tests
+- [x] Strapdown mechanization (validated on a trajectory simulator)
+- [ ] Drift & error dynamics (linearized error propagation)
 - [ ] ZUPT stance detection
 - [ ] Error-state EKF + GNSS aiding
 - [ ] Validation against RTK ground truth
