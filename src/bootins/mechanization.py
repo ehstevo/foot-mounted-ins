@@ -9,7 +9,7 @@ the body-frame Δv into NED, so attitude leads:
 
     ATTITUDE  q  ── integrate Δθ ───────────────────►  q_new
     VELOCITY  v  ── rotate Δv to nav, then add gravity ► v_new
-    POSITION  p  ── integrate v ────────────────────►  p_new      (Rung 4, TODO)
+    POSITION  p  ── integrate v ────────────────────►  p_new
 
 Conventions (from the charter / M1):
   * Attitude q = [w, x, y, z], Hamilton scalar-first, body->nav
@@ -18,15 +18,22 @@ Conventions (from the charter / M1):
   * Δθ is a body-frame rotation vector in RADIANS (deg->rad happens once, at the
     parser boundary -- charter pitfall #2).
 
-Earth rotation (ω_ie) and transport rate (ω_en) are NEGLECTED for the MVP (a
-charter decision justified by their magnitude vs the VN-100 noise floor at
-walking speed; to be quantified later in M3, then restored in a rigor pass).
+Earth rotation (ω_ie) and transport rate (ω_en) are NEGLECTED for the MVP 
+(Earth ≈ 15 °/hr ≈ the gyro bias floor, transport ≈ 0.045 °/hr, both dwarfed
+per-stride by ZUPT).
 """
+from collections.abc import Iterable
+
 import numpy as np
 
 from bootins.frames import quaternion
 
 G_NED = np.array([0.0, 0.0, 9.80665])   # local gravity vector, NED (down = +z)
+
+# Type aliases for the nav state and one IMU increment. All vectors are float64
+# ndarrays; dt is seconds.
+State = tuple[np.ndarray, np.ndarray, np.ndarray]   # (p [m, NED], v [m/s, NED], q [w,x,y,z] b->n)
+Measurement = tuple[np.ndarray, np.ndarray, float]  # (dtheta [rad, body], dv [m/s, body], dt [s])
 
 
 def attitude_update(q: np.ndarray, dtheta: np.ndarray) -> np.ndarray:
@@ -61,7 +68,8 @@ def attitude_update(q: np.ndarray, dtheta: np.ndarray) -> np.ndarray:
     return quaternion.normalize(q_new)
 
 
-def velocity_update(v, q, dv, dt, gravity=G_NED):
+def velocity_update(v: np.ndarray, q: np.ndarray, dv: np.ndarray,
+                    dt: float, gravity: np.ndarray = G_NED) -> np.ndarray:
     """One velocity step: rotate the body-frame Δv into NED and add gravity.
 
     v       : current velocity, NED (m/s)
@@ -75,7 +83,7 @@ def velocity_update(v, q, dv, dt, gravity=G_NED):
     return v_new
 
 
-def position_update(p, v, dt):
+def position_update(p: np.ndarray, v: np.ndarray, dt: float) -> np.ndarray:
     """One position step: integrate velocity over the step.
 
     p  : current position, NED (m)
@@ -87,7 +95,7 @@ def position_update(p, v, dt):
     return p + v * dt
 
 
-def mechanize_step(state, dtheta, dv, dt):
+def mechanize_step(state: State, dtheta: np.ndarray, dv: np.ndarray, dt: float) -> State:
     """Advance the nav state (p, v, q) by one IMU increment.
 
     state : (p, v, q) -- position & velocity in NED, attitude body->nav
@@ -101,7 +109,7 @@ def mechanize_step(state, dtheta, dv, dt):
     return (p_new, v_new, q_new)
 
 
-def mechanize(state0, measurements):
+def mechanize(state0: State, measurements: Iterable[Measurement]) -> list[State]:
     """Run mechanize_step over a sequence of measurements.
 
     state0       : initial (p, v, q)
