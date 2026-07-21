@@ -69,3 +69,25 @@ def test_matches_scipy_passive():
         for a in ANGLES_RAD:
             expected = Rotation.from_euler(axis, a).as_matrix().T
             np.testing.assert_allclose(rot(a), expected, atol=1e-12)
+
+
+def test_skew_matches_cross():
+    """skew is the cross-product operator written as a matrix.
+
+    Property: skew(v) is antisymmetric (skew(v).T == -skew(v)) -- necessary but,
+    like the rotation property tests above, blind to a sign flip on its own.
+    Oracle:   skew(v) @ w reproduces np.cross(v, w), an INDEPENDENT source of
+    truth that pins all six off-diagonal signs. Iterating all pairs includes the
+    v == w case, so v x v = 0 is exercised too (atol required for that zero).
+    """
+    vecs = np.array([
+        [0.0, 1.0, 2.0],
+        [2.0, 3.0, 4.0],
+        [-2.0, -4.0, -6.0],
+        [-3.0, 1.0, 6.0],
+        [4.0, -3.0, 0.0],
+    ])
+    for v in vecs:
+        np.testing.assert_allclose(rotations.skew(v).T, -rotations.skew(v), atol=1e-12)
+        for w in vecs:
+            np.testing.assert_allclose(rotations.skew(v) @ w, np.cross(v, w), atol=1e-12)

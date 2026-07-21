@@ -63,3 +63,22 @@ def rot_z(angle_rad: float) -> np.ndarray:
         [ -s,   c, 0.0],
         [0.0, 0.0, 1.0],
     ])
+
+
+def skew(v: np.ndarray) -> np.ndarray:
+    """Skew-symmetric (cross-product) matrix of a 3-vector: skew(v) @ b == v x b.
+
+    A cross product is linear in its second argument, so "cross with v" is a
+    linear map -- i.e. a matrix -- and this is that matrix. It is antisymmetric
+    (skew(v).T == -skew(v)). Used to write small rotations and cross products as
+    matrices in the error-state dynamics (see error_dynamics.py):
+
+            |  0   -v_z   v_y |
+    skew =  |  v_z   0   -v_x |
+            | -v_y   v_x   0  |
+    """
+    return np.array([
+        [0.0, -v[2], v[1]],
+        [v[2], 0.0, -v[0]],
+        [-v[1], v[0], 0.0],
+    ])
