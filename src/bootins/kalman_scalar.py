@@ -1,3 +1,24 @@
+"""Scalar (1-D) Kalman filter -- the teaching foundation for M5 (Rungs 1-2).
+
+The filter stripped to a single scalar state, where every quantity (estimate,
+variance, gain) is just a number, so the structure is naked:
+
+    predict:  x_prior = a * x            P_prior = a**2 * P + Q
+    update:   K = P / (P + R)            x_hat = x_prior + K * (z - x_prior)
+                                         P_hat = (1 - K) * P
+
+Predict GROWS the variance (drift); update SHRINKS it (information). The whole
+filter is the tug-of-war between Q and R.
+
+This module is a FROZEN pedagogical artifact -- it establishes the concepts,
+it is not the real filter. The actual navigation filter is MULTIVARIATE (state
+and covariance are vectors/matrices, with an H matrix mapping the state into
+measurement space) and lives in ``kalman.py``. Note the axis of separation is
+DIMENSIONALITY (scalar vs multivariate), NOT linearity: both this and the
+multivariate KF are linear; the linear-vs-nonlinear split is KF vs EKF, later.
+"""
+
+
 def kalman_update_scalar(
         x_prior: float, P_prior: float, z: float, R: float
     ) -> tuple[float, float]:
