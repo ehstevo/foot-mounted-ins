@@ -8,10 +8,14 @@ The goal is a correct, well-tested, research-grade implementation where every co
 and understood, not a black box. Each module is built one rung at a time: *concept → derivation →
 implementation → a test that fails if the understanding is wrong.*
 
-> **Status:** the front end is in place - BLE capture with replayable logging, a delta-form parser,
-> device-frame characterization, a from-scratch rotation toolkit (quaternion/DCM/Euler), and a
-> **working strapdown mechanization** validated end-to-end against a trajectory simulator to machine
-> precision. Next: drift & error dynamics, then the estimation stack (ZUPT + error-state EKF + GNSS).
+> **Status:** the front end and the full estimation core are in place - BLE capture with replayable
+> logging, a delta-form parser, device-frame characterization, a from-scratch rotation toolkit
+> (quaternion/DCM/Euler), a **working strapdown mechanization** validated end-to-end against a
+> trajectory simulator to machine precision, the **linearized error dynamics** (the 15x15 F matrix),
+> and the complete estimator built from first principles: scalar Kalman filter -> multivariate KF ->
+> EKF -> **error-state (indirect) EKF**, with a capstone test that recovers a hidden accelerometer
+> bias from zero-velocity updates alone. 358 tests pass. Next: **ZUPT stance detection**, then GNSS
+> aiding and validation against RTK truth.
 
 ---
 
@@ -66,7 +70,7 @@ python -m venv .venv && . .venv/bin/activate
 pip install bleak numpy scipy pyyaml pytest
 
 # Device-specific identifiers are kept out of version control:
-cp config/device.example.py config/device_local.py
+cp config/device_example.py config/device_local.py
 # then fill config/device_local.py with your device's UUIDs
 ```
 
@@ -84,9 +88,10 @@ python scripts/ble_scan.py      # Rung 1: discover the module over BLE
 - [x] Delta-form parser + device-frame characterization
 - [x] Rotation toolkit (quaternion/DCM/Euler) with analytic tests
 - [x] Strapdown mechanization (validated on a trajectory simulator)
-- [ ] Drift & error dynamics (linearized error propagation)
-- [ ] ZUPT stance detection
-- [ ] Error-state EKF + GNSS aiding
+- [x] Drift & error dynamics (linearized error propagation, the 15x15 F matrix)
+- [x] Estimation stack (scalar KF → multivariate KF → EKF → error-state EKF)
+- [ ] ZUPT stance detection ← next
+- [ ] GNSS aiding (loosely coupled: lever arm, latency, NIS outlier gating)
 - [ ] Validation against RTK ground truth
 
 ## Development

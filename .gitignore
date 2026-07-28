@@ -17,6 +17,9 @@ secrets.*
 # Project brain + ICD-derived design notes. Don't sync via git; copy manually or
 # use a private repo if you need them on another machine.
 CLAUDE.md
+# AGENTS.md is a local symlink -> CLAUDE.md so Codex (which auto-loads AGENTS.md)
+# picks up the same brain. It resolves to ICD-derived content, so keep it local too.
+AGENTS.md
 docs/
 
 # --- Captured data (large, binary, and potentially sensitive) ---
