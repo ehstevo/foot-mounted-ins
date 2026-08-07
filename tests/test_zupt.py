@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 
 from bootins.mechanization import G_NED
-from bootins.zupt import shoe_glrt, shoe_is_stance
+from bootins.zupt import shoe_glrt, shoe_is_stance, shoe_scores, shoe_stance_flags
 
 SIGMA_A = 2.0
 SIGMA_G = 3.0
@@ -124,3 +124,69 @@ def test_shoe_is_stance_uses_strict_threshold():
 
     assert not shoe_is_stance(window, threshold, SIGMA_A, SIGMA_G)
     assert shoe_is_stance(window, threshold + 1e-12, SIGMA_A, SIGMA_G)
+
+
+def test_shoe_scores_window_size_must_be_positive():
+    with pytest.raises(ValueError, match="window_size"):
+        shoe_scores([], 0, SIGMA_A, SIGMA_G)
+
+
+def test_shoe_stance_flags_negative_threshold_raises():
+    window = _window_from_rates(np.zeros(3), G * _unit([0.0, 0.0, 1.0]), [0.010, 0.010])
+
+    with pytest.raises(ValueError, match="threshold"):
+        shoe_stance_flags(window, 1, -1e-6, SIGMA_A, SIGMA_G)
+
+
+def test_shoe_scores_startup_region_is_nan():
+    window = _window_from_rates(np.zeros(3), G * _unit([1.0, 0.0, 0.0]), [0.010] * 5)
+
+    scores = shoe_scores(window, 3, SIGMA_A, SIGMA_G)
+
+    assert np.isnan(scores[0])
+    assert np.isnan(scores[1])
+    assert np.all(np.isfinite(scores[2:]))
+
+
+def test_shoe_scores_window_size_one_matches_single_sample_glrt():
+    u_body = _unit([1.0, -1.0, 2.0])
+    f_rest = G * u_body
+    omega_samples = [
+        np.array([0.0, 0.0, 0.0]),
+        np.array([0.2, -0.1, 0.0]),
+        np.array([0.0, 0.3, -0.2]),
+    ]
+    dt_samples = [0.010, 0.015, 0.020]
+    measurements = [
+        (omega * dt, f_rest * dt, dt)
+        for omega, dt in zip(omega_samples, dt_samples)
+    ]
+
+    scores = shoe_scores(measurements, 1, SIGMA_A, SIGMA_G)
+    expected = np.array([
+        shoe_glrt([measurement], SIGMA_A, SIGMA_G)
+        for measurement in measurements
+    ])
+
+    np.testing.assert_allclose(scores, expected, atol=1e-12)
+
+
+def test_shoe_stance_flags_startup_region_is_false():
+    window = _window_from_rates(np.zeros(3), G * _unit([0.0, 1.0, 0.0]), [0.010] * 4)
+
+    flags = shoe_stance_flags(window, 3, 1e-6, SIGMA_A, SIGMA_G)
+
+    assert not np.any(flags[:2])
+
+
+def test_shoe_stance_flags_turn_true_only_after_full_rest_window():
+    """The first True appears only when the trailing window is fully rest-like."""
+    u_body = _unit([0.0, 0.0, 1.0])
+    f_rest = G * u_body
+    moving = _window_from_rates(np.array([1.0, 0.0, 0.0]), f_rest, [0.010, 0.010])
+    resting = _window_from_rates(np.zeros(3), f_rest, [0.010, 0.010, 0.010])
+    measurements = moving + resting
+
+    flags = shoe_stance_flags(measurements, 3, 0.01, SIGMA_A, SIGMA_G)
+
+    np.testing.assert_array_equal(flags, [False, False, False, False, True])

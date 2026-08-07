@@ -38,6 +38,8 @@ import numpy as np
 
 from bootins.mechanization import G_NED, Measurement
 
+G = np.linalg.norm(G_NED)
+
 
 def _stack_window(window: Sequence[Measurement]) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Convert a measurement window into float64 arrays with consistent shapes.
@@ -69,8 +71,18 @@ def _stack_window(window: Sequence[Measurement]) -> tuple[np.ndarray, np.ndarray
     return dtheta, dv, dt
 
 
+def _validate_window_size(window_size: int) -> None:
+    """Validate the trailing-window length for stream-level scoring.
+
+    A zero- or negative-length window has no physical meaning for the detector,
+    so we reject it explicitly instead of relying on slicing side effects.
+    """
+    if window_size < 1:
+        raise ValueError("window_size must be at least 1 sample.")
+
+
 def shoe_glrt(window: Sequence[Measurement], sigma_a: float, sigma_g: float,
-              gravity: float = np.linalg.norm(G_NED)) -> float:
+              gravity: float = G) -> float:
     """Return the SHOE / GLRT score for one window of IMU increments.
 
     window  : sequence of (dtheta [rad], dv [m/s], dt [s]) samples
@@ -112,7 +124,7 @@ def shoe_glrt(window: Sequence[Measurement], sigma_a: float, sigma_g: float,
 
 def shoe_is_stance(window: Sequence[Measurement], threshold: float,
                    sigma_a: float, sigma_g: float,
-                   gravity: float = np.linalg.norm(G_NED)) -> bool:
+                   gravity: float = G) -> bool:
     """Classify a window as stance/non-stance using a conservative threshold.
 
     `threshold` is a detector tuning parameter chosen by the caller. We require
@@ -126,3 +138,47 @@ def shoe_is_stance(window: Sequence[Measurement], threshold: float,
         raise ValueError("threshold must be non-negative.")
 
     return shoe_glrt(window, sigma_a, sigma_g, gravity) < threshold
+
+
+def shoe_scores(measurements: Sequence[Measurement], window_size: int,
+                sigma_a: float, sigma_g: float,
+                gravity: float = G) -> np.ndarray:
+    """Return one causal GLRT score per sample in a measurement stream.
+
+    The score at index i is computed from the trailing window that ENDS at i:
+
+        measurements[i-window_size+1 : i+1]
+
+    so the output stays aligned 1:1 with the input stream. The first
+    `window_size - 1` samples do not yet have a full window; their scores are
+    returned as NaN to make that start-up region explicit.
+    """
+    _validate_window_size(window_size)
+
+    scores = np.full(len(measurements), np.nan, dtype=float)
+
+    for i in range(window_size - 1, len(measurements)):
+        window = measurements[i - window_size + 1:i + 1]
+        scores[i] = shoe_glrt(window, sigma_a, sigma_g, gravity)
+
+    return scores
+
+
+def shoe_stance_flags(measurements: Sequence[Measurement], window_size: int,
+                      threshold: float, sigma_a: float, sigma_g: float,
+                      gravity: float = G) -> np.ndarray:
+    """Return one causal stance/non-stance flag per input measurement.
+
+    This is the stream-level wrapper around `shoe_scores`: compute the trailing
+    GLRT score at each sample, then apply the same conservative threshold rule
+
+        stance iff score < threshold
+
+    Any startup NaNs (before the first full window exists) are classified as
+    non-stance, which is the safe direction for ZUPT.
+    """
+    if threshold < 0.0:
+        raise ValueError("threshold must be non-negative.")
+
+    scores = shoe_scores(measurements, window_size, sigma_a, sigma_g, gravity)
+    return np.isfinite(scores) & (scores < threshold)
