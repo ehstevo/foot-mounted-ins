@@ -14,8 +14,10 @@ implementation → a test that fails if the understanding is wrong.*
 > trajectory simulator to machine precision, the **linearized error dynamics** (the 15x15 F matrix),
 > and the complete estimator built from first principles: scalar Kalman filter -> multivariate KF ->
 > EKF -> **error-state (indirect) EKF**, with a capstone test that recovers a hidden accelerometer
-> bias from zero-velocity updates alone. 358 tests pass. Next: **ZUPT stance detection**, then GNSS
-> aiding and validation against RTK truth.
+> bias from zero-velocity updates alone. **373 tests pass.** The **SHOE / GLRT ZUPT stance
+> detector** is now implemented, including causal sliding-window scores/flags. Next: finish M6 by
+> integrating/tuning the detector in the live ZUPT path, then move on to GNSS aiding and RTK
+> validation.
 
 ---
 
@@ -90,7 +92,8 @@ python scripts/ble_scan.py      # Rung 1: discover the module over BLE
 - [x] Strapdown mechanization (validated on a trajectory simulator)
 - [x] Drift & error dynamics (linearized error propagation, the 15x15 F matrix)
 - [x] Estimation stack (scalar KF → multivariate KF → EKF → error-state EKF)
-- [ ] ZUPT stance detection ← next
+- [x] ZUPT stance detection (SHOE / GLRT + causal sliding-window scoring)
+- [ ] ZUPT integration and tuning on walking data ← next
 - [ ] GNSS aiding (loosely coupled: lever arm, latency, NIS outlier gating)
 - [ ] Validation against RTK ground truth
 
