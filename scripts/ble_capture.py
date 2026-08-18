@@ -42,6 +42,7 @@ import struct
 import time
 from datetime import datetime
 from pathlib import Path
+from tqdm import tqdm
 
 import yaml
 from bleak import BleakClient
@@ -173,7 +174,17 @@ async def main() -> None:
             async with BleakClient(address, timeout=CONNECT_TIMEOUT) as client:
                 await client.start_notify(CFG.IMU_DATA_UUID, notify_handler)
                 t0 = time.monotonic()
-                await asyncio.sleep(seconds)
+
+                with tqdm(
+                    total=seconds,
+                    desc="BMU Capture",
+                    unit='s'
+                ) as pbar:
+
+                    for _ in range(seconds):
+                        await asyncio.sleep(1)
+                        pbar.update(1)
+                
                 await client.stop_notify(CFG.IMU_DATA_UUID)
                 elapsed = time.monotonic() - t0
         except (BleakError, asyncio.TimeoutError) as e:

@@ -7,7 +7,7 @@ name = "bootins"
 version = "0.0.0"
 description = "Foot-mounted ZUPT-aided strapdown INS with loosely-coupled GNSS fusion."
 requires-python = ">=3.12"
-dependencies = ["numpy", "scipy", "pyyaml", "bleak"]
+dependencies = ["numpy", "scipy", "pyyaml", "bleak", "pytest", "tqdm"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
