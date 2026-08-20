@@ -181,7 +181,7 @@ async def main() -> None:
                     unit='s'
                 ) as pbar:
 
-                    for _ in range(seconds):
+                    for _ in range(int(seconds)):
                         await asyncio.sleep(1)
                         pbar.update(1)
                 
