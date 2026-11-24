@@ -1,0 +1,15 @@
+# Copy to config/tuning/gnss_local.yaml and replace every null before use.
+# This plan changes one declared field at a time from --base-config. Set mode
+# to cartesian only for a deliberately bounded product of all value lists.
+mode: one-at-a-time
+
+parameters:
+  - name: position-q
+    path: filter.process_covariance_diagonal.position
+    values:
+      - [null, null, null]
+
+  - name: gnss-r
+    path: filter.gnss_measurement_covariance_diagonal
+    values:
+      - [null, null, null]

@@ -1,0 +1,42 @@
+# Local configuration
+config/device_local.*
+config/trajectory_comparison_local*
+config/*/*local*.yaml
+src/bootins/bmu/device_interface_local.py
+
+# Local tests and credentials
+tests/private/
+.env
+secrets.*
+
+# Data and generated results
+data/
+logs/
+plots/
+results/
+*.bmu
+*.raw
+*.ubx
+*.ubxlog
+*.pos
+scan*.txt
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Editor and OS
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/

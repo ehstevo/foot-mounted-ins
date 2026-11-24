@@ -1,0 +1,42 @@
+startup:
+  minimum_stance_duration: null  # s; contiguous SHOE-flagged startup stance
+  startup_search_limit: null     # s; maximum time allowed to find that stance
+
+detector:
+  window_size: null              # samples; positive integer
+  threshold: null                # SHOE / GLRT score; nonnegative
+  sigma_a: null                  # specific-force noise scale
+  sigma_g: null                  # angular-rate noise scale
+
+filter:
+  # Initial nominal body-frame accelerometer-bias estimate in m/s².
+  initial_accel_bias_b: [0.0, 0.0, 0.0]
+
+  # All entries below are diagonal covariance values, not standard deviations.
+  # State-group order matches the 15-state error vector: dp, dv, dpsi, dba, dbg.
+  initial_covariance_diagonal:
+    position: [null, null, null]
+    velocity: [null, null, null]
+    attitude: [null, null, null]
+    accel_bias: [null, null, null]
+    gyro_bias: [null, null, null]
+
+  # This runner passes Q directly to each 100 Hz ESEKF predict step.
+  process_covariance_diagonal:
+    position: [null, null, null]
+    velocity: [null, null, null]
+    attitude: [null, null, null]
+    accel_bias: [null, null, null]
+    gyro_bias: [null, null, null]
+
+  # Extra covariance added only to each synthetic coast increment. It may
+  # populate dp, dv, and dpsi; bias entries must remain exactly zero.
+  coast_process_covariance_diagonal:
+    position: [null, null, null]
+    velocity: [null, null, null]
+    attitude: [null, null, null]
+    accel_bias: [0.0, 0.0, 0.0]
+    gyro_bias: [0.0, 0.0, 0.0]
+
+  # Velocity pseudo-measurement covariance for each ZUPT update.
+  zupt_measurement_covariance_diagonal: [null, null, null]

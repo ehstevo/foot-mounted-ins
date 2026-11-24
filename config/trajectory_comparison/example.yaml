@@ -1,0 +1,67 @@
+# One post-processing artifact manifest for scripts/plot_trajectory_comparison.py.
+# Copy this file to config/trajectory_comparison_local.yaml and replace every
+# example path and registration value before use. All paths are relative to this
+# file. The tool never runs or tunes a filter.
+schema_version: 1
+title: "Example trajectory comparison"
+basemap: light
+ppk_solution: ../data/example/ppk_solution.pos
+
+traces:
+  # The geographic-NED sidecar is written automatically beside an aided CSV.
+  - kind: state_csv
+    path: ../results/example_aided.csv
+    label: GNSS + INS + ZUPT
+    color: "#0072B2"
+    visible: true
+    include_in_bounds: true
+
+  # Raw receiver positions remain receiver/antenna evidence, not foot truth.
+  - kind: gnss_fix_table
+    path: ../data/example/gnss_fixes.csv
+    label: Receiver fixes
+    color: "#E69F00"
+    visible: true
+    include_in_bounds: true
+
+  # The default PPK layer retains the complete time-ordered solution, including
+  # both Q=1 fixed and Q=2 float rows.
+  - kind: ppk
+    quality: all
+    label: PPK solution (Q=1 + Q=2)
+    color: "#009E73"
+    visible: true
+    include_in_bounds: true
+
+  # Local-FRD state rows need a deliberately declared, presentation-only
+  # alignment. Choose exactly one anchor: anchor_ppk_gpst, or anchor_gnss_fix
+  # with a receiver-valid table row at its exact GPS week/time-of-week. Heading
+  # rotates Forward/Right into North/East. Determine every registration value
+  # deliberately for the recording being presented; this checked-in manifest is
+  # intentionally non-executable until its placeholders are replaced.
+  - kind: state_csv
+    path: ../results/example_zupt.csv
+    label: INS + ZUPT
+    color: "#56B4E9"
+    visible: true
+    include_in_bounds: true
+    registration:
+      anchor_ppk_gpst: "<ISO-8601 PPK epoch anchoring state row zero>"
+      # Alternative when PPK is unavailable:
+      # anchor_gnss_fix:
+      #   path: ../data/example/gnss_fixes.csv
+      #   gps_week: 0
+      #   gps_tow: 0.0
+      heading_deg_clockwise_from_north: 0.0  # Replace with recording-specific heading.
+
+  # A raw INS divergence can make a useful map unreadably zoomed out. Preserve
+  # it as a toggleable layer, but exclude it from the initial map extent.
+  - kind: state_csv
+    path: ../results/example_raw.csv
+    label: Raw INS
+    color: "#D55E00"
+    visible: false
+    include_in_bounds: false
+    registration:
+      anchor_ppk_gpst: "<ISO-8601 PPK epoch anchoring state row zero>"
+      heading_deg_clockwise_from_north: 0.0  # Replace with recording-specific heading.

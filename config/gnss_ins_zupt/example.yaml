@@ -1,0 +1,54 @@
+startup:
+  initial_stance_duration: null       # s; leading contiguous SHOE-flagged stance
+  initial_stance_search_limit: null   # s; maximum time allowed to find it
+  terminal_stance_duration: null      # s; post-course contiguous SHOE-flagged stance
+  terminal_stance_search_limit: null  # s; maximum time allowed to find it
+  course_minimum_fix_count: null      # receiver-valid fixes
+  course_minimum_baseline: null       # m; first-to-last projected travel distance
+  course_maximum_cross_track_rms: null  # m; maximum straight-course residual
+
+detector:
+  window_size: null  # samples; positive integer
+  threshold: null    # SHOE / GLRT score; nonnegative
+  sigma_a: null      # specific-force noise scale
+  sigma_g: null      # angular-rate noise scale
+
+filter:
+  # Initial nominal body-frame accelerometer-bias estimate in m/s².
+  initial_accel_bias_b: [0.0, 0.0, 0.0]
+
+  # All entries below are diagonal covariance values, not standard deviations.
+  # State-group order matches the 16-state error vector: dp, dv, dpsi, dba, dbg, dtau.
+  initial_covariance_diagonal:
+    position: [null, null, null]
+    velocity: [null, null, null]
+    attitude: [null, null, null]
+    accel_bias: [null, null, null]
+    gyro_bias: [null, null, null]
+    clock_offset: null
+
+  # This runner passes Q directly to each IMU-posterior predict step.
+  process_covariance_diagonal:
+    position: [null, null, null]
+    velocity: [null, null, null]
+    attitude: [null, null, null]
+    accel_bias: [null, null, null]
+    gyro_bias: [null, null, null]
+    clock_offset: null
+
+  # Extra covariance added only to each synthetic coast increment. It may
+  # populate dp, dv, and dpsi; bias and clock entries must remain exactly zero.
+  coast_process_covariance_diagonal:
+    position: [null, null, null]
+    velocity: [null, null, null]
+    attitude: [null, null, null]
+    accel_bias: [0.0, 0.0, 0.0]
+    gyro_bias: [0.0, 0.0, 0.0]
+    clock_offset: 0.0
+
+  # Velocity pseudo-measurement covariance for each ZUPT update.
+  zupt_measurement_covariance_diagonal: [null, null, null]
+
+  # Local-NED GNSS position measurement covariance for each accepted fix.
+  gnss_measurement_covariance_diagonal: [null, null, null]
+  nis_threshold: null
