@@ -1,4 +1,5 @@
 # GPS-INS-Boot
+[![Public tests](https://github.com/ehstevo/foot-mounted-ins/actions/workflows/public-tests.yml/badge.svg)](https://github.com/ehstevo/foot-mounted-ins/actions/workflows/public-tests.yml)
 
 ## Foot-Mounted Inertial Navigation and GNSS Fusion
 
