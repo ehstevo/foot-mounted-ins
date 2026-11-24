@@ -34,6 +34,11 @@ estimates begin to diverge.
 GNSS-aided inertial navigation, standalone GNSS, and the postprocessed GNSS
 reference.*
 
+**[Explore the interactive trajectory map](https://ehstevo.github.io/foot-mounted-ins/assets/maps/pi_long_interactive.html)**
+
+The interactive map allows individual trajectory layers to be toggled
+for a closer comparison of the navigation solutions.
+
 Post-processed kinematic (PPK) GNSS provides a useful reference trajectory for
 comparing these estimates. It is not perfect ground truth, particularly because
 the GNSS antenna and foot-mounted IMU occupy different positions.
